@@ -319,6 +319,19 @@ class TestExtractMedia:
         assert "Here" in cleaned
         assert "After" in cleaned
 
+    def test_media_tag_supports_markdown_document_paths(self):
+        content = "Please send the checklist.\nMEDIA:/tmp/runpod-deployment-verification-checklist.md"
+        media, cleaned = BasePlatformAdapter.extract_media(content)
+        assert media == [("/tmp/runpod-deployment-verification-checklist.md", False)]
+        assert "MEDIA:" not in cleaned
+        assert "Please send the checklist." in cleaned
+
+    def test_media_tag_supports_text_document_paths_with_spaces(self):
+        content = 'MEDIA: "/tmp/Review this Document.txt"'
+        media, cleaned = BasePlatformAdapter.extract_media(content)
+        assert media == [("/tmp/Review this Document.txt", False)]
+        assert cleaned == ""
+
 
 # ---------------------------------------------------------------------------
 # truncate_message
