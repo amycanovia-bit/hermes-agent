@@ -164,6 +164,8 @@ Custom endpoint pools are stored in `auth.json` under `credential_pool` with a `
 }
 ```
 
+When Hermes loads a custom endpoint pool, it re-aligns each saved entry's `base_url` to the endpoint's current configured `base_url`. This helps custom endpoints like RunPod pods recover cleanly after a restart or replacement changes the public URL.
+
 ## Auto-Discovery
 
 Hermes automatically discovers credentials from multiple sources and seeds the pool on startup:

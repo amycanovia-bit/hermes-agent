@@ -903,6 +903,52 @@ def test_custom_pool_does_not_break_existing_providers(tmp_path, monkeypatch):
     assert entry.access_token == "sk-or-test"
 
 
+def test_custom_pool_refreshes_stale_cached_base_url(tmp_path, monkeypatch):
+    """Custom pools should stop reusing a stale cached endpoint after config changes."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+    _write_auth_store(
+        tmp_path,
+        {
+            "version": 1,
+            "credential_pool": {
+                "custom:dreamai-runpod": [
+                    {
+                        "id": "cached-pod",
+                        "label": "old-runpod",
+                        "auth_type": "api_key",
+                        "priority": 0,
+                        "source": "manual",
+                        "access_token": "***",
+                        "base_url": "https://stale-pod.runpod.net/v1",
+                    }
+                ]
+            },
+        },
+    )
+
+    import yaml
+    config_path = tmp_path / "hermes" / "config.yaml"
+    config_path.write_text(yaml.dump({
+        "custom_providers": [
+            {
+                "name": "DreamAI RunPod",
+                "base_url": "https://fresh-pod.runpod.net/v1",
+                "api_key": "***",
+            }
+        ]
+    }))
+
+    from agent.credential_pool import load_pool
+
+    pool = load_pool("custom:dreamai-runpod")
+    entry = pool.select()
+
+    assert entry is not None
+    assert entry.base_url == "https://fresh-pod.runpod.net/v1"
+    persisted = json.loads((tmp_path / "hermes" / "auth.json").read_text())
+    assert persisted["credential_pool"]["custom:dreamai-runpod"][0]["base_url"] == "https://fresh-pod.runpod.net/v1"
+
+
 def test_get_custom_provider_pool_key(tmp_path, monkeypatch):
     """get_custom_provider_pool_key maps base_url to custom:<name> pool key."""
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))

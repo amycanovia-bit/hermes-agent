@@ -332,6 +332,33 @@ def _get_custom_provider_config(pool_key: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _sync_custom_pool_base_urls(pool_key: str, entries: List[PooledCredential]) -> bool:
+    """Align custom-pool entry base URLs with the current config base URL.
+
+    Custom pools are keyed by the saved custom provider name, so every entry in
+    that pool should target the provider's currently configured endpoint. This
+    prevents stale cached endpoints (for example, a terminated RunPod pod URL)
+    from continuing to win fill-first selection after the config now points to a
+    freshly started replacement endpoint.
+    """
+    cp_config = _get_custom_provider_config(pool_key)
+    if not cp_config:
+        return False
+
+    configured_base_url = str(cp_config.get("base_url") or "").strip().rstrip("/")
+    if not configured_base_url:
+        return False
+
+    changed = False
+    for idx, entry in enumerate(entries):
+        current_base_url = str(entry.base_url or "").strip().rstrip("/")
+        if current_base_url == configured_base_url:
+            continue
+        entries[idx] = replace(entry, base_url=configured_base_url)
+        changed = True
+    return changed
+
+
 def get_pool_strategy(provider: str) -> str:
     """Return the configured selection strategy for a provider."""
     config = _load_config_safe()
@@ -1141,6 +1168,7 @@ def load_pool(provider: str) -> CredentialPool:
         # Custom endpoint pool — seed from custom_providers config and model config
         custom_changed, custom_sources = _seed_custom_pool(provider, entries)
         changed = custom_changed
+        changed |= _sync_custom_pool_base_urls(provider, entries)
         changed |= _prune_stale_seeded_entries(entries, custom_sources)
     else:
         singleton_changed, singleton_sources = _seed_from_singletons(provider, entries)
